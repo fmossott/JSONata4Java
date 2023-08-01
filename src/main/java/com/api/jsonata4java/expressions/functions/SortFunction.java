@@ -35,181 +35,163 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 
-public class SortFunction extends FunctionBase implements Function {
+public class SortFunction extends FunctionBase {
 
-	private static final long serialVersionUID = -2957077099198389545L;
+    public static String ERR_BAD_CONTEXT = String.format(Constants.ERR_MSG_BAD_CONTEXT, Constants.FUNCTION_SORT);
+    public static String ERR_ARG1BADTYPE = String.format(Constants.ERR_MSG_ARG1_BAD_TYPE, Constants.FUNCTION_SORT);
+    public static String ERR_ARG2BADTYPE = String.format(Constants.ERR_MSG_ARG2_BAD_TYPE, Constants.FUNCTION_SORT);
+    public static String ERR_FCTNOTFOUND = String.format(Constants.ERR_MSG_FCT_NOT_FOUND, Constants.FUNCTION_SORT);
+    public static String ERR_ARG1BADARRAYTYPE = String.format(Constants.ERR_MSG_ARG1_MUST_BE_ARRAY,
+        Constants.FUNCTION_SORT);
 
-	public static String ERR_BAD_CONTEXT = String.format(Constants.ERR_MSG_BAD_CONTEXT, Constants.FUNCTION_SORT);
-	public static String ERR_ARG1BADTYPE = String.format(Constants.ERR_MSG_ARG1_BAD_TYPE, Constants.FUNCTION_SORT);
-	public static String ERR_ARG2BADTYPE = String.format(Constants.ERR_MSG_ARG2_BAD_TYPE, Constants.FUNCTION_SORT);
-	public static String ERR_FCTNOTFOUND = String.format(Constants.ERR_MSG_FCT_NOT_FOUND, Constants.FUNCTION_SORT);
-	public static String ERR_ARG1BADARRAYTYPE = String.format(Constants.ERR_MSG_ARG1_MUST_BE_ARRAY,
-			Constants.FUNCTION_SORT);
+    public JsonNode invoke(ExpressionsVisitor expressionVisitor, Function_callContext ctx) {
+        ArrayNode result = null;
+        final CtxEvalResult ctxEvalResult = evalContext(expressionVisitor, ctx);
+        final JsonNode arg = ctxEvalResult.arg;
+        final int argCount = ctxEvalResult.argumentCount;
+        final boolean useContext = ctxEvalResult.useContext;
 
-	public JsonNode invoke(ExpressionsVisitor expressionVisitor, Function_callContext ctx) {
-		ArrayNode result = JsonNodeFactory.instance.arrayNode();
-		// Retrieve the number of arguments
-		JsonNode arg = JsonNodeFactory.instance.nullNode();
-		boolean useContext = FunctionUtils.useContextVariable(this, ctx, getSignature());
-		int argCount = getArgumentCount(ctx);
-		if (useContext) {
-			arg = FunctionUtils.getContextVariable(expressionVisitor);
-			if (arg != null && arg.isNull() == false) {
-				argCount++;
-			} else {
-				useContext = false;
-			}
-		}
+        if (argCount == 0 && arg == null) {
+            // signal no match (result = null)
+        } else if (argCount == 1) {
+            if (arg == null || arg.isNull()) {
+                if (useContext) {
+                    throw new EvaluateRuntimeException(ERR_ARG1BADTYPE);
+                }
+                // else signal no match (result = null)
+            } else if (arg.isArray()) {
+                result = JsonNodeFactory.instance.arrayNode();
+                final ArrayNode array = (ArrayNode) arg;
+                for (final JsonNode node : array) {
+                    result.add(node);
+                }
+                msort(result, null, expressionVisitor, ctx);
+            } else {
+                result = JsonNodeFactory.instance.arrayNode();
+                result.add(arg);
+            }
+        } else if (argCount == 2) {
+            // use the defined function comparator
+            DeclaredFunction fct = null;
+            // if arg is an array, return its length. Any other type of input
+            // returns 1.
+            if (arg == null) {
+                throw new EvaluateRuntimeException(ERR_ARG1BADTYPE);
+            }
 
-		// Make sure that we have the right number of arguments
-		if (argCount == 1) {
-			if (!useContext) {
-				// use the default comparator
-				arg = expressionVisitor.visit(ctx.exprValues().exprList().expr(0));
-			}
-			// if arg is an array, return its length. Any other type of input
-			// returns 1.
-			if (arg == null || arg.isNull()) {
-				if (useContext) {
-					throw new EvaluateRuntimeException(ERR_ARG1BADTYPE);
-				} else {
-					return null;
-				}
-			} else if (arg.isArray()) {
-				ArrayNode array = (ArrayNode) arg;
-				for (int i = 0; i < array.size(); i++) {
-					result.add(array.get(i));
-				}
-				msort(result, null, expressionVisitor, ctx);
-			} else {
-				// allow to work with any input
-				result.add(arg);
-				return result;
-			}
-		} else if (argCount == 2) {
-			// use the defined function comparator
-			DeclaredFunction fct = null;
-			if (!useContext) {
-				// use the default comparator
-				arg = expressionVisitor.visit(ctx.exprValues().exprList().expr(0));
-			}
-			// if arg is an array, return its length. Any other type of input
-			// returns 1.
-			if (arg == null) {
-				throw new EvaluateRuntimeException(ERR_ARG1BADTYPE);
-			}
+            ExprContext fctCtx = ctx.exprValues().exprList().expr(useContext ? 0 : 1);
+            if (fctCtx == null) {
+                throw new EvaluateRuntimeException(ERR_ARG2BADTYPE);
+            }
 
-			ExprContext fctCtx = ctx.exprValues().exprList().expr(useContext ? 0 : 1);
-			if (fctCtx == null) {
-				throw new EvaluateRuntimeException(ERR_ARG2BADTYPE);
-			}
+            if (!(fctCtx instanceof MappingExpressionParser.Function_declContext)) {
+                if (!(fctCtx instanceof MappingExpressionParser.Var_recallContext)) {
+                    throw new EvaluateRuntimeException("Expected an function declaration reference but got "
+                        + fctCtx.getText() + " that is an " + fctCtx.getClass().getName());
+                }
+                String varID = ((MappingExpressionParser.Var_recallContext) fctCtx).VAR_ID().getText();
+                fct = expressionVisitor.getDeclaredFunction(varID);
+                if (fct == null) {
+                    throw new EvaluateRuntimeException(
+                        String.format(Constants.ERR_MSG_VARIABLE_FCT_NOT_FOUND, varID, Constants.FUNCTION_SORT));
+                }
+            } else {
+                MappingExpressionParser.Function_declContext fctDeclCtx = (MappingExpressionParser.Function_declContext) fctCtx;
+                MappingExpressionParser.VarListContext varList = fctDeclCtx.varList();
+                MappingExpressionParser.ExprListContext exprList = fctDeclCtx.exprList();
+                try {
+                    fct = new DeclaredFunction(varList, exprList);
+                } catch (EvaluateRuntimeException e) {
+                    throw new EvaluateRuntimeException(ERR_FCTNOTFOUND);
+                }
+            }
+            // if arg is an array, return its length. Any other type of input
+            // returns 1.
+            if (arg.isArray()) {
+                ArrayNode array = (ArrayNode) arg;
+                result = JsonNodeFactory.instance.arrayNode();
+                for (int i = 0; i < array.size(); i++) {
+                    result.add(array.get(i));
+                }
+                msort(result, fct, expressionVisitor, ctx);
+            } else {
+                result = JsonNodeFactory.instance.arrayNode();
+                result.add(arg);
+            }
+        } else {
+            throw new EvaluateRuntimeException(argCount == 0 ? ERR_ARG1BADTYPE : ERR_ARG2BADTYPE);
+        }
 
-			if (!(fctCtx instanceof MappingExpressionParser.Function_declContext)) {
-				if (!(fctCtx instanceof MappingExpressionParser.Var_recallContext)) {
-					throw new EvaluateRuntimeException("Expected an function declaration reference but got "
-							+ fctCtx.getText() + " that is an " + fctCtx.getClass().getName());
-				}
-				String varID = ((MappingExpressionParser.Var_recallContext) fctCtx).VAR_ID().getText();
-				fct = expressionVisitor.getDeclaredFunction(varID);
-				if (fct == null) {
-					throw new EvaluateRuntimeException(
-							String.format(Constants.ERR_MSG_VARIABLE_FCT_NOT_FOUND, varID, Constants.FUNCTION_SORT));
-				}
-			} else {
-				MappingExpressionParser.Function_declContext fctDeclCtx = (MappingExpressionParser.Function_declContext) fctCtx;
-				MappingExpressionParser.VarListContext varList = fctDeclCtx.varList();
-				MappingExpressionParser.ExprListContext exprList = fctDeclCtx.exprList();
-				try {
-					fct = new DeclaredFunction(varList, exprList);
-				} catch (EvaluateRuntimeException e) {
-					throw new EvaluateRuntimeException(ERR_FCTNOTFOUND);
-				}
-			}
-			// if arg is an array, return its length. Any other type of input
-			// returns 1.
-			if (arg.isArray()) {
-				ArrayNode array = (ArrayNode) arg;
-				for (int i = 0; i < array.size(); i++) {
-					result.add(array.get(i));
-				}
-				msort(result, fct, expressionVisitor, ctx);
-			} else {
-				result.add(arg);
-			}
+        return result;
+    }
 
-		} else {
-			throw new EvaluateRuntimeException(argCount == 0 ? ERR_ARG1BADTYPE : ERR_ARG2BADTYPE);
-		}
+    @Override
+    public int getMaxArgs() {
+        return 2;
+    }
 
-		return result;
-	}
+    @Override
+    public int getMinArgs() {
+        return 1;
+    }
 
-	@Override
-	public int getMaxArgs() {
-		return 2;
-	}
-	@Override
-	public int getMinArgs() {
-		return 1;
-	}
+    @Override
+    public String getSignature() {
+        // accepts anything and an optional function, returns an array
+        return "<xf?:a>";
+    }
 
-	@Override
-	public String getSignature() {
-		// accepts an array, an optional function, returns an array
-		return "<af?:a>";
-	}
+    void msort(ArrayNode array, DeclaredFunction fct, ExpressionsVisitor exprVisitor, Function_callContext ctx) {
+        int n = array.size();
+        if (array == null || n < 2) {
+            return;
+        }
+        int middle = (int) Math.floor(n / 2);
+        ArrayNode left = ArrayUtils.slice(array, 0, middle);
+        ArrayNode right = ArrayUtils.slice(array, middle);
+        msort(left, fct, exprVisitor, ctx);
+        msort(right, fct, exprVisitor, ctx);
+        merge(array, left, right, fct, exprVisitor, ctx);
+    }
 
-	void msort(ArrayNode array, DeclaredFunction fct, ExpressionsVisitor exprVisitor, Function_callContext ctx) {
-		int n = array.size();
-		if (array == null || n < 2) {
-			return;
-		}
-		int middle = (int) Math.floor(n / 2);
-		ArrayNode left = ArrayUtils.slice(array, 0, middle);
-		ArrayNode right = ArrayUtils.slice(array, middle);
-		msort(left, fct, exprVisitor, ctx);
-		msort(right, fct, exprVisitor, ctx);
-		merge(array, left, right, fct, exprVisitor, ctx);
-	}
-
-	void merge(ArrayNode array, ArrayNode left, ArrayNode right, DeclaredFunction fct, ExpressionsVisitor exprVisitor,
-			Function_callContext ctx) {
-		int lSize = left.size();
-		int rSize = right.size();
-		int i = 0, j = 0, k = 0;
-		if (fct == null) {
-			while (i < lSize && j < rSize) {
-				if (ArrayUtils.compare(left.get(i), right.get(j))) {
-					array.set(k++, right.get(j++));
-				} else {
-					array.set(k++, left.get(i++));
-				}
-			}
-			while (i < lSize) {
-				array.set(k++, left.get(i++));
-			}
-			while (j < rSize) {
-				array.set(k++, right.get(j++));
-			}
-		} else {
-			int varCount = fct.getMaxArgs();
-			while (i < lSize && j < rSize) {
-				// set up the variables for the function then call it
-				ExprValuesContext evc = new ExprValuesContext(ctx.getParent(), ctx.invokingState);
-				evc = FunctionUtils.fillExprVarContext(varCount, ctx, left.get(i), right.get(j));
-				JsonNode comp = fct.invoke(exprVisitor, evc);
-				if (comp != null && comp.asBoolean()) {
-					array.set(k++, right.get(j++));
-				} else {
-					array.set(k++, left.get(i++));
-				}
-			}
-			while (i < lSize) {
-				array.set(k++, left.get(i++));
-			}
-			while (j < rSize) {
-				array.set(k++, right.get(j++));
-			}
-		}
-	}
+    void merge(ArrayNode array, ArrayNode left, ArrayNode right, DeclaredFunction fct, ExpressionsVisitor exprVisitor,
+        Function_callContext ctx) {
+        int lSize = left.size();
+        int rSize = right.size();
+        int i = 0, j = 0, k = 0;
+        if (fct == null) {
+            while (i < lSize && j < rSize) {
+                if (ArrayUtils.compare(left.get(i), right.get(j))) {
+                    array.set(k++, right.get(j++));
+                } else {
+                    array.set(k++, left.get(i++));
+                }
+            }
+            while (i < lSize) {
+                array.set(k++, left.get(i++));
+            }
+            while (j < rSize) {
+                array.set(k++, right.get(j++));
+            }
+        } else {
+            int varCount = fct.getMaxArgs();
+            while (i < lSize && j < rSize) {
+                // set up the variables for the function then call it
+                ExprValuesContext evc = new ExprValuesContext(ctx.getParent(), ctx.invokingState);
+                evc = FunctionUtils.fillExprVarContext(varCount, ctx, left.get(i), right.get(j));
+                JsonNode comp = fct.invoke(exprVisitor, evc);
+                if (comp != null && comp.asBoolean()) {
+                    array.set(k++, right.get(j++));
+                } else {
+                    array.set(k++, left.get(i++));
+                }
+            }
+            while (i < lSize) {
+                array.set(k++, left.get(i++));
+            }
+            while (j < rSize) {
+                array.set(k++, right.get(j++));
+            }
+        }
+    }
 }

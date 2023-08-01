@@ -22,38 +22,77 @@
 
 package com.api.jsonata4java.expressions.functions;
 
-import java.io.Serializable;
-
+import com.api.jsonata4java.expressions.ExpressionsVisitor;
 import com.api.jsonata4java.expressions.generated.MappingExpressionParser.Function_callContext;
+import com.api.jsonata4java.expressions.utils.FunctionUtils;
+import com.fasterxml.jackson.databind.JsonNode;
 
-public abstract class FunctionBase implements Serializable {
+public abstract class FunctionBase {
 
-	private static final long serialVersionUID = -2198474650471622735L;
+    public abstract int getMaxArgs();
 
-	/**
-	 * The getFunctionName method retrieves the name of the function from the
-	 * context
-	 *
-	 * @param ctx The Function_callContext for the function.
-	 * @return String The name of the function.
-	 */
-	public String getFunctionName(Function_callContext ctx) {
-		return ctx.VAR_ID().getText();
-	}
+    public abstract int getMinArgs();
 
-	/**
-	 * The getArgumentCount method counts the number of expressions in the
-	 * expression list.
-	 *
-	 * @param ctx The Function_callContext for the function.
-	 * @return int The number of arguments for the function
-	 */
-	static public int getArgumentCount(Function_callContext ctx) {
-		if (ctx.emptyValues() != null)
-			return 0; // no variables
-		if (ctx.exprValues().exprList() == null)
-			return 0;
+    public abstract String getSignature();
 
-		return ctx.exprValues().exprList().expr().size();
-	}
+    public abstract JsonNode invoke(ExpressionsVisitor expressionVisitor, Function_callContext ctx);
+
+    protected class CtxEvalResult {
+
+        public final JsonNode arg;
+        public final int argumentCount;
+        public final boolean useContext;
+
+        public CtxEvalResult(JsonNode arg, int argumentCount, boolean useContext) {
+            this.arg = arg;
+            this.argumentCount = argumentCount;
+            this.useContext = useContext;
+        }
+    }
+
+    protected CtxEvalResult evalContext(ExpressionsVisitor expressionVisitor, Function_callContext ctx) {
+        JsonNode arg = null;
+        int argCount = getArgumentCount(ctx);
+        boolean useContext = FunctionUtils.useContextVariable(this, ctx, getSignature());
+        if (useContext) {
+            arg = FunctionUtils.getContextVariable(expressionVisitor);
+            if (arg != null && arg.isNull() == false) {
+                argCount++;
+            } else {
+                useContext = false;
+            }
+        }
+        if (argCount > 0 && !useContext && ctx.exprValues() != null && ctx.exprValues().exprList() != null
+            && !ctx.exprValues().exprList().isEmpty()) {
+            arg = expressionVisitor.visit(ctx.exprValues().exprList().expr(0));
+        }
+        return new CtxEvalResult(arg, argCount, useContext);
+    }
+
+    /**
+     * The getFunctionName method retrieves the name of the function from the
+     * context
+     *
+     * @param ctx The Function_callContext for the function.
+     * @return String The name of the function.
+     */
+    public String getFunctionName(Function_callContext ctx) {
+        return ctx.VAR_ID().getText();
+    }
+
+    /**
+     * The getArgumentCount method counts the number of expressions in the
+     * expression list.
+     *
+     * @param ctx The Function_callContext for the function.
+     * @return int The number of arguments for the function
+     */
+    static public int getArgumentCount(Function_callContext ctx) {
+        if (ctx.emptyValues() != null)
+            return 0; // no variables
+        if (ctx.exprValues().exprList() == null)
+            return 0;
+
+        return ctx.exprValues().exprList().expr().size();
+    }
 }
