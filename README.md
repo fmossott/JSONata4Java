@@ -8,13 +8,13 @@ JSONata was created by Andrew Coleman to provide many of the features that XPath
 * [JSONata Documentation](http://docs.jsonata.org/overview.html)
 * [JavaScript JSONata github repository](https://github.com/jsonata-js/jsonata)
 
-JSONata4Java is an attempt to port the jsonata.js 1.8.4 capabilities to Java 1.8. 
+JSONata4Java is an attempt to port the jsonata.js 1.8.4 capabilities to Java 17. 
 The easiest way to use this library is to include it as a dependency in your Maven pom.xml using these line&colon;
 ```
 <dependency>
   <groupId>com.ibm.jsonata4java</groupId>
   <artifactId>JSONata4Java</artifactId>
-  <version>2.4.3</version>
+  <version>2.6.1</version>
 </dependency>
 ```
 
@@ -28,13 +28,11 @@ git clone https://github.com/IBM/JSONata4Java.git
 The Java version uses ANTLR to build the parser for the language, and Java Objects are more tightly controlled that JavaScript Objects. Therefore, some things differ between the Java implementation and JavaScript implementation. For example:
  - we require functions to be called with their arguments, even if no arguments are being passed. This is because we differentiate a variable reference with no parentheses from a function that has parentheses. 
  - we require variables to begin with a letter or an underscore (but not a number) whereas jsonata.org allows variables to begin with numbers ([Issue 267](https://github.com/IBM/JSONata4Java/issues/267)).
- - Arrays hold JsonNode types so can not hold references to functions, whereas jsonata.org can manage function references within an array ([Issue 268](https://github.com/IBM/JSONata4Java/issues/268)).  
+ - Arrays hold JsonNode types so cannot hold references to functions, whereas jsonata.org can manage function references within an array ([Issue 268](https://github.com/IBM/JSONata4Java/issues/268)).  
 
-### Java 11 and 1.8 Versions needed for new Antlr 4.11.1 (Also updated project file to Eclipse 2023-03)
+### Java 17 Version needed for new Antlr 4.13.1 (Also updated project file to Eclipse 2025-09)
 
-The code was created using IBM Semeru Runtime Open Edition 11.0.17.0 (build 11.0.17+8). You can import the project into Eclipse 2023-03 or newer. This is to allow the newer version of ANTLR to generate necessary code from the g4 file defining the language.  You can download the Java JDK 11 from https://developer.ibm.com/languages/java/semeru-runtimes/downloads/?license=IBM 
-
-** *However, the build dependencies are set to allow use with Java 1.8* **
+The code was created using IBM Semeru Runtime Open Edition 17.0.8.1 (build 17.0.8.1+1). You can import the project into Eclipse 2025-06 or newer. This is to allow the newer version of ANTLR to generate necessary code from the g4 file defining the language.  You can download the Java JDK 17 from https://developer.ibm.com/languages/java/semeru-runtimes/downloads/?license=IBM 
 
 
 ### Building the jar files
@@ -53,8 +51,8 @@ Note: to build and deploy the jars to Maven Central you need to use a command li
 `mvn clean install deploy -Prelease`
 
 Once you have run the launcher, you can find the jar files in the /target directory. There are two&colon;
-* **JSONata4Java-2.4.3-jar-with-dependencies.jar** (thinks includes dependent jar files)
-* **JSONata4Java-2.4.3.jar** (only the JSONata4Java code)
+* **JSONata4Java-2.6.1-jar-with-dependencies.jar** (thinks includes dependent jar files)
+* **JSONata4Java-2.6.1.jar** (only the JSONata4Java code)
 
 The com.api.jsonata4java.Tester program enables you to enter an expression and run it 
 against the same JSON as is used at the https://try.jsonata.org site. You can also 
@@ -66,14 +64,26 @@ against the same JSON as is used at the https://try.jsonata.org site.
 
 
 ### Fixes ###
+Issue 401 fixed a problem where we didn't allow ArrayContext types as argument 1 for max
+
+Issue 366 fixed a problem where the less than and greater than fields for sorting were interpreted the opposite from jsonata  
+
+Issue 313 fixed a problem with duplicates in the spread function
+
 Issue 167 to add Synced suffixed evaluation methods to allow people running 
 in a multi-threaded environment to use evaluateSynced, etc. The non-Synced 
 methods are not thread-safe.
 
 Issue 260 to add support for timeoutMS and maxDepth to the evaluate methods in Expression.
 
+### New Feature for Version 2.5.0 ###
+Fixed signature checking to allow for functions (see Issue #307)
+
+### New Feature for Version 2.4.9 ###
+The $number function was updated to allow strings with 0x, 0o, 0b prefixes for hexadecimal, octal, and binary conversions. The value returned can handle long values.
 
 ### New Feature for Version 2.4 ###
+A new function for $fromMillisZoned has been added to allow passing a Timezone string as the 3rd parameter.
 We support now a simple version of JSONata's Order-by operator (see https://docs.jsonata.org/path-operators#---order-by).
 
 ### New Features for Version 2 ###
@@ -81,7 +91,7 @@ Many thanks to **Martin Bluemel** for adding these new features&colon;
 
 **Improved Chaining**&colon;
 JSONata4Java basically does support function chaining now. However, it does not yet 
-support the "function name only" syntax for function chaining (the one without paratheses). 
+support the "function name only" syntax for function chaining (the one without parentheses). 
 So we recommend using a syntax like below&colon;
 
 ```

@@ -29,7 +29,7 @@ public class MergeFunctionTest {
 
     @Test
     public void nullInput() throws Exception {
-        test("$merge()", null, null, (String) null);
+        test("$merge()", null, MergeFunction.ERR_ARG1BADTYPE, (String) null);
     }
 
     @Test
@@ -84,7 +84,7 @@ public class MergeFunctionTest {
     }
 
     @Test
-    public void issue237IncosistentQuotationMarkSanitization() throws Exception {
+    public void issue237InconsistentQuotationMarkSanitization() throws Exception {
         test("$each($, function($v, $k) {({ $k: $v})}) ~> $merge()", "{\"key1\":\"\\\"v1\\\"\"}", null, "{ \"key1\": \"\\\"v1\\\"\" }");
     }
 }

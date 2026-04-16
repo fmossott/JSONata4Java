@@ -121,7 +121,7 @@ public class SpreadFunction extends FunctionBase {
             String key = it.next();
             ObjectNode cell = JsonNodeFactory.instance.objectNode();
             cell.set(key, obj.get(key));
-            result = (ArrayNode) append(result, cell);
+            result = concat(result, cell);
         }
         return result;
     }
@@ -161,7 +161,7 @@ public class SpreadFunction extends FunctionBase {
             }
         } else {
             /*
-             * The input argument is not an object nor array of objects. Throw a suitable
+             * The input argument is neither an object nor an array of objects. Throw a suitable
              * exception
              */
             // throw new EvaluateRuntimeException(ERR_ARG1BADTYPE);
@@ -197,6 +197,7 @@ public class SpreadFunction extends FunctionBase {
             result.add(elt);
         }
         if (appendage.isArray()) {
+            result.removeAll();
             for (JsonNode elt : appendage) {
                 result.add(elt);
             }

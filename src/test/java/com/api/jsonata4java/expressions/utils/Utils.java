@@ -132,7 +132,7 @@ public class Utils implements Serializable {
      * @param expression expression to be tested
      * @param expected result expected
      * @param expectedEvaluateExceptionMsg the text of an expected exception
-     * @param rootContext the json object against which the expression is evalated
+     * @param rootContext the json object against which the expression is evaluated
      * @throws Exception if expected values are not provided
      */
     public static void test(String expression, JsonNode expected, String expectedEvaluateExceptionMsg,
@@ -195,7 +195,7 @@ public class Utils implements Serializable {
         switch (input.getNodeType()) {
             case OBJECT: {
                 ObjectNode output = JsonNodeFactory.instance.objectNode();
-                Iterator<Entry<String, JsonNode>> it = ((ObjectNode) input).fields();
+                Iterator<Entry<String, JsonNode>> it = ((ObjectNode) input).properties().iterator();
                 while (it.hasNext()) {
                     Entry<String, JsonNode> e = it.next();
                     String field = e.getKey();

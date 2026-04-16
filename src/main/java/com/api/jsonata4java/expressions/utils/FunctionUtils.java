@@ -26,6 +26,8 @@ import java.io.Serializable;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
+
+import com.api.jsonata4java.expressions.functions.NoContextFunction;
 import org.antlr.v4.runtime.CommonToken;
 import org.antlr.v4.runtime.CommonTokenFactory;
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -37,6 +39,7 @@ import com.api.jsonata4java.expressions.ExpressionsVisitor;
 import com.api.jsonata4java.expressions.functions.DeclaredFunction;
 import com.api.jsonata4java.expressions.functions.FunctionBase;
 import com.api.jsonata4java.expressions.generated.MappingExpressionParser;
+import com.api.jsonata4java.expressions.generated.MappingExpressionParser.ArrayContext;
 import com.api.jsonata4java.expressions.generated.MappingExpressionParser.Array_constructorContext;
 import com.api.jsonata4java.expressions.generated.MappingExpressionParser.BooleanContext;
 import com.api.jsonata4java.expressions.generated.MappingExpressionParser.Context_refContext;
@@ -406,7 +409,7 @@ public class FunctionUtils implements Serializable {
         int count = 0;
         CommonToken token = null;
         TerminalNode tn = null;
-        for (Iterator<Entry<String, JsonNode>> it = object.fields(); it.hasNext();) {
+        for (Iterator<Entry<String, JsonNode>> it = object.properties().iterator(); it.hasNext();) {
             Entry<String, JsonNode> field = it.next();
             count++;
             if (count > 1) {
@@ -607,6 +610,9 @@ public class FunctionUtils implements Serializable {
                     if (test.isNumber()) {
                         return true;
                     }
+                } else if (exprCtx instanceof ArrayContext) {
+                   // must be array of numbers or a number
+                   return true;               	 
                 } else if (exprCtx instanceof NumberContext || exprCtx instanceof Unary_opContext) {
                     // must be array of numbers or a number
                     return true;
@@ -614,6 +620,8 @@ public class FunctionUtils implements Serializable {
                     return true;
                 } else if (exprCtx instanceof IdContext) {
                     return true;
+                } else if (exprCtx instanceof Function_callContext) {
+               	 return true;
                 }
             }
         }
@@ -666,6 +674,9 @@ public class FunctionUtils implements Serializable {
      */
     public static JsonNode processVariablesCallFunction(ExpressionsVisitor exprVisitor, FunctionBase function,
         TerminalNode varid, Function_callContext ctx, JsonNode... elements) {
+        if (function instanceof NoContextFunction)
+            return ((NoContextFunction) function).invoke(elements);
+
         ExprListContext elc = new ExprListContext(ctx.getParent(), ctx.invokingState);
         ExprValuesContext evc = new ExprValuesContext(ctx.getParent(), ctx.invokingState);
         evc.addAnyChild(new TerminalNodeImpl(CommonTokenFactory.DEFAULT.create(MappingExpressionParser.T__1, "(")));
@@ -900,6 +911,13 @@ public class FunctionUtils implements Serializable {
 
         // does the signature permit use of the context as a argument
         if (signature.indexOf("-") >= 0 && prc != null && prc instanceof PathContext) {
+      	   int child_count = prc.children != null ? prc.children.size() : 0;
+      	   if (child_count > 0) {
+      	   	Object first_child = prc.getChild(0);
+      	   	if (first_child instanceof Function_callContext) {
+      	   		return false;
+      	   	}
+      	   }
             return true;
         }
 
